@@ -3,12 +3,8 @@
   "WorkspaceRootPath": "C:\\Users\\Angel\\Desktop\\School\\C969_C\\SchedulingApp\\",
   "Documents": [
     {
-      "AbsoluteMoniker": "D:0:0:{74F22703-72FC-4BB8-9997-2D0C7DC23F09}|SchedulingApp.csproj|c:\\users\\angel\\desktop\\school\\c969_c\\schedulingapp\\appointmentinfo.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}|Form",
-      "RelativeMoniker": "D:0:0:{74F22703-72FC-4BB8-9997-2D0C7DC23F09}|SchedulingApp.csproj|solutionrelative:appointmentinfo.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}|Form"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{74F22703-72FC-4BB8-9997-2D0C7DC23F09}|SchedulingApp.csproj|c:\\users\\angel\\desktop\\school\\c969_c\\schedulingapp\\appointmentinfo.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{74F22703-72FC-4BB8-9997-2D0C7DC23F09}|SchedulingApp.csproj|solutionrelative:appointmentinfo.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+      "AbsoluteMoniker": "D:0:0:{74F22703-72FC-4BB8-9997-2D0C7DC23F09}|SchedulingApp.csproj|c:\\users\\angel\\desktop\\school\\c969_c\\schedulingapp\\inputvalidator.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{74F22703-72FC-4BB8-9997-2D0C7DC23F09}|SchedulingApp.csproj|solutionrelative:inputvalidator.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     }
   ],
   "DocumentGroupContainers": [
@@ -31,26 +27,14 @@
             {
               "$type": "Document",
               "DocumentIndex": 0,
-              "Title": "appointmentinfo.cs [Design]",
-              "DocumentMoniker": "C:\\Users\\Angel\\Desktop\\School\\C969_C\\SchedulingApp\\appointmentinfo.cs",
-              "RelativeDocumentMoniker": "appointmentinfo.cs",
-              "ToolTip": "C:\\Users\\Angel\\Desktop\\School\\C969_C\\SchedulingApp\\appointmentinfo.cs [Design]",
-              "RelativeToolTip": "appointmentinfo.cs [Design]",
+              "Title": "InputValidator.cs",
+              "DocumentMoniker": "C:\\Users\\Angel\\Desktop\\School\\C969_C\\SchedulingApp\\InputValidator.cs",
+              "RelativeDocumentMoniker": "InputValidator.cs",
+              "ToolTip": "C:\\Users\\Angel\\Desktop\\School\\C969_C\\SchedulingApp\\InputValidator.cs",
+              "RelativeToolTip": "InputValidator.cs",
+              "ViewState": "AgIAABUAAAAAAAAAAAAqwCYAAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-01-25T14:18:12.967Z",
-              "EditorCaption": " [Design]"
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 1,
-              "Title": "appointmentinfo.cs",
-              "DocumentMoniker": "C:\\Users\\Angel\\Desktop\\School\\C969_C\\SchedulingApp\\appointmentinfo.cs",
-              "RelativeDocumentMoniker": "appointmentinfo.cs",
-              "ToolTip": "C:\\Users\\Angel\\Desktop\\School\\C969_C\\SchedulingApp\\appointmentinfo.cs",
-              "RelativeToolTip": "appointmentinfo.cs",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-01-25T14:18:09.841Z",
+              "WhenOpened": "2026-02-07T12:47:03.446Z",
               "EditorCaption": ""
             }
           ]

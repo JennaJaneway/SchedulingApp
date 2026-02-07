@@ -1,54 +1,91 @@
-﻿using MySql.Data.MySqlClient;
+﻿using MySqlConnector;
 using System;
-using System.Collections.Generic;
+using System.Configuration;
 using System.Data;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace SchedulingApp
     {
     public static class DbManager
         {
-        private static readonly string connectionString = "server=localhost;database=scheduling_db;user=root;password=MySQLpa$$1;";
+        private static readonly string connectionString =
+            ConfigurationManager.ConnectionStrings["client_schedule"].ConnectionString;
 
-        // Retrieve Customers datatable
+        public static MySqlConnection GetConnection() => new MySqlConnection(connectionString);
+
+        // Validates user credentials
+        public static int ValidateUser(string username, string password)
+            {
+            using (var conn = new MySqlConnection(connectionString))
+            using (var cmd = new MySqlCommand(
+                "SELECT userId FROM `user` WHERE userName = @UserName AND password = @Password LIMIT 1;",
+                conn))
+                {
+                conn.Open();
+                cmd.Parameters.AddWithValue("@UserName", username);
+                cmd.Parameters.AddWithValue("@Password", password);
+
+                object result = cmd.ExecuteScalar();
+                return (result == null) ? -1 : Convert.ToInt32(result);
+                }
+            }
+
+        // Retrieves Customers datatable
         public static DataTable GetCustomers()
             {
             DataTable dt = new DataTable();
+
             using (MySqlConnection conn = new MySqlConnection(connectionString))
                 {
                 conn.Open();
-                string query = "SELECT CustomerID, Name, Email, Phone, Address FROM customers";
+
+                string query = @"
+                SELECT
+                    c.customerId   AS CustomerID,
+                    c.customerName AS Name,
+                    a.phone        AS Phone,
+                    a.address      AS Address,
+                    a.postalCode   AS PostalCode,
+                    ci.city        AS City,
+                    co.country     AS Country,
+                    c.active       AS Active
+                FROM customer c
+                JOIN address a   ON c.addressId = a.addressId
+                JOIN city ci     ON a.cityId = ci.cityId
+                JOIN country co  ON ci.countryId = co.countryId
+                ORDER BY c.customerId;";
+
                 using (MySqlCommand cmd = new MySqlCommand(query, conn))
                 using (MySqlDataAdapter adapter = new MySqlDataAdapter(cmd))
                     {
                     adapter.Fill(dt);
                     }
                 }
+
             return dt;
             }
+
 
         // Retrieve Appointments datatable for a specific customer
         public static DataTable GetAppointments(int customerId)
             {
-            DataTable dt = new DataTable();DbManager.GetAllAppointments();
+            DataTable dt = new DataTable();
             using (MySqlConnection conn = new MySqlConnection(connectionString))
                 {
                 conn.Open();
 
-                string query = @"
-                    SELECT a.AppointmentID,
-                           c.Name AS CustomerName,  -- Use 'Name' to match your table
-                           a.Title AS AppointmentType,
-                           a.Start,
-                           a.End
-                    FROM appointments a
-                    JOIN customers c ON a.CustomerID = c.CustomerID
-                    WHERE a.CustomerID = @CustomerID
-                    ORDER BY a.Start";
+                string sql = @"
+                SELECT
+                    a.appointmentId,
+                    c.customerName AS CustomerName,
+                    a.title        AS AppointmentType,
+                    a.start        AS Start,
+                    a.end          AS End
+                FROM appointment a
+                JOIN customer c ON a.customerId = c.customerId
+                WHERE a.customerId = @CustomerID
+                ORDER BY a.start;";
 
-                using (MySqlCommand cmd = new MySqlCommand(query, conn))
+                using (MySqlCommand cmd = new MySqlCommand(sql, conn))
                     {
                     cmd.Parameters.AddWithValue("@CustomerID", customerId);
 
@@ -66,18 +103,19 @@ namespace SchedulingApp
         public static DataTable GetAllAppointments()
             {
             DataTable dt = new DataTable();
-            string query = @"
-            SELECT a.AppointmentID,
-                   c.Name AS CustomerName,
-                   a.Title AS AppointmentType,
-                   a.Start,
-                   a.End
-            FROM appointments a
-            JOIN customers c ON a.CustomerID = c.CustomerID
-            ORDER BY a.Start;";
+            string sql = @"
+            SELECT
+                a.appointmentId,
+                c.customerName AS CustomerName,
+                a.title        AS AppointmentType,
+                a.start        AS Start,
+                a.end          AS End
+            FROM appointment a
+            JOIN customer c ON a.customerId = c.customerId
+            ORDER BY a.start;";
 
             using (MySqlConnection conn = new MySqlConnection(connectionString))
-            using (MySqlCommand cmd = new MySqlCommand(query, conn))
+            using (MySqlCommand cmd = new MySqlCommand(sql, conn))
             using (MySqlDataAdapter adapter = new MySqlDataAdapter(cmd))
                 {
                 conn.Open();
@@ -87,58 +125,246 @@ namespace SchedulingApp
             return dt;
             }
 
+        public static DataRow GetCustomerById(int customerId)
+            {
+            DataTable dt = new DataTable();
+
+            using (MySqlConnection conn = new MySqlConnection(connectionString))
+                {
+                conn.Open();
+
+                string query = @"
+                SELECT
+                    c.customerId   AS CustomerID,
+                    c.customerName AS Name,
+                    a.phone        AS Phone,
+                    a.address      AS Address,
+                    a.postalCode   AS PostalCode,
+                    ci.city        AS City,
+                    co.country     AS Country,
+                    c.active       AS Active
+                FROM customer c
+                JOIN address a   ON c.addressId = a.addressId
+                JOIN city ci     ON a.cityId = ci.cityId
+                JOIN country co  ON ci.countryId = co.countryId
+                WHERE c.customerId = @CustomerID
+                LIMIT 1;";
+
+                using (MySqlCommand cmd = new MySqlCommand(query, conn))
+                    {
+                    cmd.Parameters.AddWithValue("@CustomerID", customerId);
+
+                    using (MySqlDataAdapter adapter = new MySqlDataAdapter(cmd))
+                        {
+                        adapter.Fill(dt);
+                        }
+                    }
+                }
+
+            return dt.Rows.Count > 0 ? dt.Rows[0] : null;
+            }
+
         // Add new customer
-        public static void AddCustomer(string name, string email, string phone, string address)
+        public static void AddCustomer(string name, string phone, string address, string city, string country, string zip)
             {
             using (var conn = new MySqlConnection(connectionString))
                 {
                 conn.Open();
-                string query = "INSERT INTO customers (Name, Email, Phone, Address) VALUES (@Name, @Email, @Phone, @Address)";
-                using (var cmd = new MySqlCommand(query, conn))
+                using (var tx = conn.BeginTransaction())
                     {
-                    cmd.Parameters.AddWithValue("@Name", name);
-                    cmd.Parameters.AddWithValue("@Email", email);
-                    cmd.Parameters.AddWithValue("@Phone", phone);
-                    cmd.Parameters.AddWithValue("@Address", address);
-                    cmd.ExecuteNonQuery();
+                    // Ensures country exists
+                    var countryCmd = new MySqlCommand(@"
+                INSERT INTO country (country, createDate, createdBy, lastUpdate, lastUpdateBy)
+                SELECT @Country, NOW(), @User, NOW(), @User
+                WHERE NOT EXISTS (SELECT 1 FROM country WHERE country = @Country);", conn, tx);
+
+                    countryCmd.Parameters.AddWithValue("@Country", country);
+                    countryCmd.Parameters.AddWithValue("@User", Session.CurrentUsername);
+                    countryCmd.ExecuteNonQuery();
+
+                    // Ensures city exists (tied to that country)
+                    var cityCmd = new MySqlCommand(@"
+                    INSERT INTO city (city, countryId, createDate, createdBy, lastUpdate, lastUpdateBy)
+                    SELECT @City,
+                           (SELECT countryId FROM country WHERE country = @Country LIMIT 1),
+                           NOW(), @User, NOW(), @User
+                    WHERE NOT EXISTS (
+                        SELECT 1 FROM city
+                        WHERE city = @City AND countryId = (SELECT countryId FROM country WHERE country = @Country LIMIT 1)
+                    );", conn, tx);
+
+                    cityCmd.Parameters.AddWithValue("@City", city);
+                    cityCmd.Parameters.AddWithValue("@Country", country);
+                    cityCmd.Parameters.AddWithValue("@User", Session.CurrentUsername);
+                    cityCmd.ExecuteNonQuery();
+
+                    // Insert address (cityId must match city + country)
+                    var addressCmd = new MySqlCommand(@"
+                    INSERT INTO address (address, address2, cityId, postalCode, phone, createDate, createdBy, lastUpdate, lastUpdateBy)
+                    VALUES (
+                        @Address,
+                        '',
+                        (SELECT ci.cityId
+                           FROM city ci
+                           JOIN country co ON co.countryId = ci.countryId
+                          WHERE ci.city = @City AND co.country = @Country
+                          LIMIT 1),
+                        @Postal,
+                        @Phone,
+                        NOW(), @User, NOW(), @User
+                    );", conn, tx);
+
+                    addressCmd.Parameters.AddWithValue("@Address", address);
+                    addressCmd.Parameters.AddWithValue("@City", city);
+                    addressCmd.Parameters.AddWithValue("@Country", country);
+                    addressCmd.Parameters.AddWithValue("@Postal", zip);
+                    addressCmd.Parameters.AddWithValue("@Phone", phone);
+                    addressCmd.Parameters.AddWithValue("@User", Session.CurrentUsername);
+                    addressCmd.ExecuteNonQuery();
+
+
+                    long addressId = addressCmd.LastInsertedId;
+
+                    // Insert customer
+                    var customerCmd = new MySqlCommand(@"
+                    INSERT INTO customer (customerName, addressId, active, createDate, createdBy, lastUpdateBy)
+                    VALUES (@Name, @AddressId, 1, NOW(), @User, @User);", conn, tx);
+
+                    customerCmd.Parameters.AddWithValue("@Name", name);
+                    customerCmd.Parameters.AddWithValue("@AddressId", addressId);
+                    customerCmd.Parameters.AddWithValue("@User", Session.CurrentUsername); // or "app" if you prefer
+                    customerCmd.ExecuteNonQuery();
+
+                    tx.Commit();
                     }
                 }
             }
 
         // Update existing customer
-        public static void UpdateCustomer(int customerId, string name, string email, string phone, string address)
+        public static void UpdateCustomer(int customerId, string name, string phone, string address, string city, string country, string zip)
             {
             using (var conn = new MySqlConnection(connectionString))
                 {
                 conn.Open();
-                string query = "UPDATE customers SET Name=@Name, Email=@Email, Phone=@Phone, Address=@Address WHERE CustomerID=@CustomerID";
-                using (var cmd = new MySqlCommand(query, conn))
+                using (var tx = conn.BeginTransaction())
                     {
-                    cmd.Parameters.AddWithValue("@CustomerID", customerId);
-                    cmd.Parameters.AddWithValue("@Name", name);
-                    cmd.Parameters.AddWithValue("@Email", email);
-                    cmd.Parameters.AddWithValue("@Phone", phone);
-                    cmd.Parameters.AddWithValue("@Address", address);
-                    cmd.ExecuteNonQuery();
+                    // Update customer name
+                    var cmd1 = new MySqlCommand(@"
+                    UPDATE customer
+                    SET customerName = @Name,
+                        lastUpdate = NOW(),
+                        lastUpdateBy = @User
+                    WHERE customerId = @CustomerID;", conn, tx);
+
+                    cmd1.Parameters.AddWithValue("@CustomerID", customerId);
+                    cmd1.Parameters.AddWithValue("@Name", name);
+                    cmd1.Parameters.AddWithValue("@User", Session.CurrentUsername ?? "app");
+                    cmd1.ExecuteNonQuery();
+
+                    var ensureCountryCmd = new MySqlCommand(@"
+                    INSERT INTO country (country, createDate, createdBy, lastUpdate, lastUpdateBy)
+                    SELECT @Country, NOW(), @User, NOW(), @User
+                    WHERE NOT EXISTS (SELECT 1 FROM country WHERE country = @Country);", conn, tx);
+
+                    ensureCountryCmd.Parameters.AddWithValue("@Country", country);
+                    ensureCountryCmd.Parameters.AddWithValue("@User", Session.CurrentUsername ?? "app");
+                    ensureCountryCmd.ExecuteNonQuery();
+
+                    var ensureCityCmd = new MySqlCommand(@"
+                    INSERT INTO city (city, countryId, createDate, createdBy, lastUpdate, lastUpdateBy)
+                    SELECT @City,
+                           (SELECT countryId FROM country WHERE country = @Country LIMIT 1),
+                           NOW(), @User, NOW(), @User
+                    WHERE NOT EXISTS (
+                        SELECT 1 FROM city
+                        WHERE city = @City
+                          AND countryId = (SELECT countryId FROM country WHERE country = @Country LIMIT 1)
+                    );", conn, tx);
+
+                    ensureCityCmd.Parameters.AddWithValue("@City", city);
+                    ensureCityCmd.Parameters.AddWithValue("@Country", country);
+                    ensureCityCmd.Parameters.AddWithValue("@User", Session.CurrentUsername ?? "app");
+                    ensureCityCmd.ExecuteNonQuery();
+
+                    var getCityIdCmd = new MySqlCommand(@"
+                    SELECT ci.cityId
+                    FROM city ci
+                    JOIN country co ON co.countryId = ci.countryId
+                    WHERE ci.city = @City AND co.country = @Country
+                    LIMIT 1;", conn, tx);
+
+                    getCityIdCmd.Parameters.AddWithValue("@City", city);
+                    getCityIdCmd.Parameters.AddWithValue("@Country", country);
+
+                    object cityIdObj = getCityIdCmd.ExecuteScalar();
+                    if (cityIdObj == null)
+                        throw new Exception("Could not resolve cityId for the given City/Country.");
+
+                    int cityId = Convert.ToInt32(cityIdObj);
+
+                    // Update linked address fields (now uses @CityId and @Postal)
+                    var cmd2 = new MySqlCommand(@"
+                    UPDATE address a
+                    JOIN customer c ON c.addressId = a.addressId
+                    SET a.address = @Address,
+                        a.phone = @Phone,
+                        a.postalCode = @Postal,
+                        a.cityId = @CityId,
+                        a.lastUpdate = NOW(),
+                        a.lastUpdateBy = @User
+                    WHERE c.customerId = @CustomerID;", conn, tx);
+
+                    cmd2.Parameters.AddWithValue("@CustomerID", customerId);
+                    cmd2.Parameters.AddWithValue("@Address", address);
+                    cmd2.Parameters.AddWithValue("@Phone", phone);
+                    cmd2.Parameters.AddWithValue("@Postal", zip);
+                    cmd2.Parameters.AddWithValue("@CityId", cityId);
+                    cmd2.Parameters.AddWithValue("@User", Session.CurrentUsername ?? "app");
+                    cmd2.ExecuteNonQuery();
+
+                    tx.Commit();
                     }
                 }
             }
 
-        // Delete customer
+        // ******* DELETE CUSTOMER (also deletes appointments and address) *******
         public static void DeleteCustomer(int customerId)
             {
             using (var conn = new MySqlConnection(connectionString))
                 {
                 conn.Open();
-                string query = "DELETE FROM customers WHERE CustomerID=@CustomerID";
-                using (var cmd = new MySqlCommand(query, conn))
+                using (var tx = conn.BeginTransaction())
                     {
-                    cmd.Parameters.AddWithValue("@CustomerID", customerId);
-                    cmd.ExecuteNonQuery();
+                    // Remove appointments first
+                    var delAppts = new MySqlCommand("DELETE FROM appointment WHERE customerId = @CustomerID;", conn, tx);
+                    delAppts.Parameters.AddWithValue("@CustomerID", customerId);
+                    delAppts.ExecuteNonQuery();
+
+                    // Get addressId
+                    var getAddr = new MySqlCommand("SELECT addressId FROM customer WHERE customerId = @CustomerID LIMIT 1;", conn, tx);
+                    getAddr.Parameters.AddWithValue("@CustomerID", customerId);
+                    object addrObj = getAddr.ExecuteScalar();
+                    int? addressId = (addrObj == null) ? (int?)null : Convert.ToInt32(addrObj);
+
+                    // Delete customer
+                    var delCust = new MySqlCommand("DELETE FROM customer WHERE customerId = @CustomerID;", conn, tx);
+                    delCust.Parameters.AddWithValue("@CustomerID", customerId);
+                    delCust.ExecuteNonQuery();
+
+                    // Delete address row
+                    if (addressId.HasValue)
+                        {
+                        var delAddr = new MySqlCommand("DELETE FROM address WHERE addressId = @AddressID;", conn, tx);
+                        delAddr.Parameters.AddWithValue("@AddressID", addressId.Value);
+                        delAddr.ExecuteNonQuery();
+                        }
+
+                    tx.Commit();
                     }
                 }
             }
 
+        // Check for upcoming appointment within X minutes for a user (used at login)
         public static DataRow GetUpcomingAppointmentWithinMinutes(int userId, int minutes)
             {
             DataTable dt = new DataTable();
@@ -146,23 +372,22 @@ namespace SchedulingApp
             using (var conn = new MySqlConnection(connectionString))
                 {
                 conn.Open();
-                DateTime now = DateTime.Now;
-                now = new DateTime(now.Year, now.Month, now.Day, now.Hour, now.Minute, 0); // drop seconds
 
+                DateTime now = DateTime.UtcNow;
                 DateTime soon = now.AddMinutes(minutes);
 
                 string sql = @"
-            SELECT AppointmentID, Title, Start, End
-            FROM appointments
-            WHERE UserID = @UserID
-              AND Start >= @Now
-              AND Start <= @Soon
-            ORDER BY Start
-            LIMIT 1;";
+                SELECT appointmentId, title, start, end
+                FROM appointment
+                WHERE userId = @userId
+                AND start >= @Now
+                AND start <= @Soon
+                ORDER BY start
+                LIMIT 1;";
 
                 using (var cmd = new MySqlCommand(sql, conn))
                     {
-                    cmd.Parameters.AddWithValue("@UserID", userId);
+                    cmd.Parameters.AddWithValue("@userId", userId);
                     cmd.Parameters.AddWithValue("@Now", now);
                     cmd.Parameters.AddWithValue("@Soon", soon);
 
@@ -176,18 +401,6 @@ namespace SchedulingApp
             return dt.Rows.Count > 0 ? dt.Rows[0] : null;
             }
 
-        public static int GetUserIdByUsername(string username)
-            {
-            using (var conn = new MySqlConnection(connectionString))
-            using (var cmd = new MySqlCommand("SELECT UserID FROM users WHERE UserName = @UserName LIMIT 1;", conn))
-                {
-                conn.Open();
-                cmd.Parameters.AddWithValue("@UserName", username);
-                object result = cmd.ExecuteScalar();
-                if (result == null) throw new Exception("User not found in database.");
-                return Convert.ToInt32(result);
-                }
-            }
 
         // Get appointments by specific date
         public static DataTable GetAppointmentsByDate(DateTime date)
@@ -198,18 +411,19 @@ namespace SchedulingApp
                 {
                 conn.Open();
 
-                string query = @"
-            SELECT a.AppointmentID,
-                   c.Name AS CustomerName,
-                   a.Title AS AppointmentType,
-                   a.Start,
-                   a.End
-            FROM appointments a
-            JOIN customers c ON a.CustomerID = c.CustomerID
-            WHERE DATE(a.Start) = @date
-            ORDER BY a.Start";
+                string sql = @"
+                SELECT
+                    a.appointmentId,
+                    c.customerName AS CustomerName,
+                    a.title        AS AppointmentType,
+                    a.start        AS Start,
+                    a.end          AS End
+                FROM appointment a
+                JOIN customer c ON a.customerId = c.customerId
+                WHERE DATE(a.start) = @date
+                ORDER BY a.start;";
 
-                using (MySqlCommand cmd = new MySqlCommand(query, conn))
+                using (MySqlCommand cmd = new MySqlCommand(sql, conn))
                     {
                     cmd.Parameters.AddWithValue("@date", date.Date);
 
@@ -230,20 +444,22 @@ namespace SchedulingApp
                 {
                 conn.Open();
 
-                string query = @"
-SELECT a.AppointmentID,
-       a.CustomerID,
-       c.Name AS CustomerName,
-       a.Title AS AppointmentType,
-       a.Start,
-       a.End
-FROM appointments a
-JOIN customers c ON a.CustomerID = c.CustomerID
-WHERE a.AppointmentID = @AppointmentID";
+                string sql = @"
+                SELECT
+                    a.appointmentId,
+                    a.customerId,
+                    c.customerName AS CustomerName,
+                    a.title        AS AppointmentType,
+                    a.start        AS Start,
+                    a.end          AS End
+                FROM appointment a
+                JOIN customer c ON a.customerId = c.customerId
+                WHERE a.appointmentId = @appointmentId;";
 
-                using (var cmd = new MySqlCommand(query, conn))
+
+                using (MySqlCommand cmd = new MySqlCommand(sql, conn))
                     {
-                    cmd.Parameters.AddWithValue("@AppointmentID", appointmentId);
+                    cmd.Parameters.AddWithValue("@appointmentId", appointmentId);
 
                     using (var adapter = new MySqlDataAdapter(cmd))
                         {
@@ -255,27 +471,26 @@ WHERE a.AppointmentID = @AppointmentID";
                 }
             }
 
-
-        //Check for overlapping appointments
+        // Check for overlapping appointments
         public static bool AppointmentOverlapsForUser(int? appointmentId, int userId, DateTime newStart, DateTime newEnd)
             {
             const string sql = @"
-        SELECT COUNT(*)
-        FROM appointments
-        WHERE UserID = @UserID
-          AND Start < @NewEnd
-          AND End > @NewStart
-          AND (@AppointmentID IS NULL OR AppointmentID <> @AppointmentID);";
+            SELECT COUNT(*)
+            FROM appointment
+            WHERE userId = @userId
+              AND start<@NewEnd
+              AND end> @NewStart
+              AND (@appointmentId IS NULL OR appointmentId <> @appointmentId); ";
 
             using (var conn = new MySqlConnection(connectionString))
             using (var cmd = new MySqlCommand(sql, conn))
                 {
                 conn.Open();
-                cmd.Parameters.AddWithValue("@UserID", userId);
+                cmd.Parameters.AddWithValue("@userId", userId);
                 cmd.Parameters.AddWithValue("@NewStart", newStart);
                 cmd.Parameters.AddWithValue("@NewEnd", newEnd);
                 cmd.Parameters.AddWithValue(
-                    "@AppointmentID",
+                    "@appointmentId",
                     appointmentId.HasValue ? (object)appointmentId.Value : DBNull.Value
                 );
 
@@ -284,42 +499,84 @@ WHERE a.AppointmentID = @AppointmentID";
                 }
             }
 
-        // Add new appointment
+        // *********** ADD NEW APPOINTMENT ***********
         public static void AddAppointment(int customerId, int userId, string title, DateTime start, DateTime end)
             {
+            // Required defaults section
+            string description = "404. No appointment description found";
+            string location = "In office";
+            string contact = "N/A";
+            string type = "N/A";
+            string url = "404. No URL found.";
+            string user = Session.CurrentUsername ?? "app";
+
             using (var conn = new MySqlConnection(connectionString))
                 {
                 conn.Open();
+
                 string query = @"
-            INSERT INTO appointments (CustomerID, UserID, Title, Start, End)
-            VALUES (@CustomerID, @UserID, @Title, @Start, @End)";
+                INSERT INTO appointment
+                (customerId, userId, title, description, location, contact, type, url,
+                 start, end, createDate, createdBy, lastUpdateBy)
+                VALUES
+                (@CustomerID, @UserID, @Title, @Description, @Location, @Contact, @Type, @Url,
+                 @Start, @End, NOW(), @User, @User);";
 
                 using (var cmd = new MySqlCommand(query, conn))
                     {
                     cmd.Parameters.AddWithValue("@CustomerID", customerId);
                     cmd.Parameters.AddWithValue("@UserID", userId);
                     cmd.Parameters.AddWithValue("@Title", title);
+                    cmd.Parameters.AddWithValue("@Description", description);
+                    cmd.Parameters.AddWithValue("@Location", location);
+                    cmd.Parameters.AddWithValue("@Contact", contact);
+                    cmd.Parameters.AddWithValue("@Type", type);
+                    cmd.Parameters.AddWithValue("@Url", url);
                     cmd.Parameters.AddWithValue("@Start", start);
                     cmd.Parameters.AddWithValue("@End", end);
+                    cmd.Parameters.AddWithValue("@User", user);
+
                     cmd.ExecuteNonQuery();
                     }
                 }
             }
 
-        // Update existing appointment
-        public static void UpdateAppointment(int appointmentId, int customerId, int userId, string title, DateTime start, DateTime end)
+        // ********** UPDATE APPOINTMENT **********
+        public static void UpdateAppointment(
+        int appointmentId,
+        int customerId,
+        int userId,
+        string type,
+        DateTime startUtc,
+        DateTime endUtc)
             {
+            // Backstage defaults 
+            string user = Session.CurrentUsername ?? "app";
+            string title = $"{type}";
+            string description = "404. No appointment description found";
+            string location = "N/A";
+            string contact = "N/A";
+            string url = "N/A";
+
             using (var conn = new MySqlConnection(connectionString))
                 {
                 conn.Open();
+
                 string query = @"
-            UPDATE appointments
-            SET CustomerID=@CustomerID,
-                UserID=@UserID,
-                Title=@Title,
-                Start=@Start,
-                End=@End
-            WHERE AppointmentID=@AppointmentID";
+                UPDATE appointment
+                SET customerId = @CustomerID,
+                    userId = @UserID,
+                    title = @Title,
+                    description = @Description,
+                    location = @Location,
+                    contact = @Contact,
+                    type = @Type,
+                    url = @Url,
+                    start = @Start,
+                    end = @End,
+                    lastUpdate = NOW(),
+                    lastUpdateBy = @User
+                WHERE appointmentId = @AppointmentID;";
 
                 using (var cmd = new MySqlCommand(query, conn))
                     {
@@ -327,35 +584,36 @@ WHERE a.AppointmentID = @AppointmentID";
                     cmd.Parameters.AddWithValue("@CustomerID", customerId);
                     cmd.Parameters.AddWithValue("@UserID", userId);
                     cmd.Parameters.AddWithValue("@Title", title);
-                    cmd.Parameters.AddWithValue("@Start", start);
-                    cmd.Parameters.AddWithValue("@End", end);
+                    cmd.Parameters.AddWithValue("@Description", description);
+                    cmd.Parameters.AddWithValue("@Location", location);
+                    cmd.Parameters.AddWithValue("@Contact", contact);
+                    cmd.Parameters.AddWithValue("@Type", type);
+                    cmd.Parameters.AddWithValue("@Url", url);
+                    cmd.Parameters.AddWithValue("@Start", startUtc);
+                    cmd.Parameters.AddWithValue("@End", endUtc);
+                    cmd.Parameters.AddWithValue("@User", user);
+
                     cmd.ExecuteNonQuery();
                     }
                 }
             }
 
-        // Delete appointment
+        // ***** DELETE APPOINTMENT *****
         public static void DeleteAppointment(int appointmentId)
             {
             using (var conn = new MySqlConnection(connectionString))
                 {
                 conn.Open();
-                string query = "DELETE FROM appointments WHERE AppointmentID=@AppointmentID";
+                string query = "DELETE FROM appointment WHERE appointmentId=@appointmentId";
                 using (var cmd = new MySqlCommand(query, conn))
                     {
-                    cmd.Parameters.AddWithValue("@AppointmentID", appointmentId);
+                    cmd.Parameters.AddWithValue("@appointmentId", appointmentId);
                     cmd.ExecuteNonQuery();
                     }
                 }
             }
 
-        // Helper method to get a new database connection
-        public static MySqlConnection GetConnection()
-            {
-            return new MySqlConnection(connectionString);
-            }
-
-        // Get appointments for reports
+        // ******* GET APPOINTMENTS FOR REPORTS (includes user and customer info) *******
         public static DataTable GetAppointmentsForReports()
             {
             DataTable dt = new DataTable();
@@ -364,19 +622,19 @@ WHERE a.AppointmentID = @AppointmentID";
                 {
                 conn.Open();
                 string sql = @"
-            SELECT 
-                a.AppointmentID,
-                a.UserID,
-                u.UserName,
-                a.CustomerID,
-                c.Name AS CustomerName,
-                a.Title AS AppointmentType,
-                a.Start,
-                a.End
-            FROM appointments a
-            JOIN customers c ON a.CustomerID = c.CustomerID
-            JOIN users u ON a.UserID = u.UserID;
-        ";
+                SELECT 
+                    a.appointmentId,
+                    a.userId,
+                    u.userName,
+                    a.customerID,
+                    c.customerName AS CustomerName,
+                    a.title AS AppointmentType,
+                    a.start,
+                    a.end
+                FROM appointment a
+                JOIN customer c ON a.customerID = c.customerID
+                JOIN `user` u ON a.userId = u.userId;
+                ";
 
                 using (var cmd = new MySqlCommand(sql, conn))
                 using (var adapter = new MySqlDataAdapter(cmd))

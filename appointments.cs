@@ -1,4 +1,4 @@
-﻿using MySql.Data.MySqlClient;
+﻿using MySqlConnector;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -21,13 +21,13 @@ namespace SchedulingApp
         public Appointments()
             {
             InitializeComponent();
-            _customerId = null;     // Null means show all appointments, any customer
+            _customerId = null;     // Null means show all appointment, any customer
             _customerName = null;
             this.Text = "All Appointments";
             this.AcceptButton = null;
             }
 
-        // Constructor for specific customer appointments
+        // Constructor for specific customer appointment
         public Appointments(int customerId, string customerName)
             {
             InitializeComponent();
@@ -37,6 +37,7 @@ namespace SchedulingApp
             this.AcceptButton = null;
             }
 
+        // Convert Start/End columns from UTC (DB) to LOCAL (UI)
         private void ConvertUtcColumnsToLocal(DataTable dt)
             {
             if (dt == null) return;
@@ -70,67 +71,38 @@ namespace SchedulingApp
             {
             try
                 {
-                // Styling setup
-                DataGridViewAppointments.AutoGenerateColumns = true;
-                DataGridViewAppointments.EnableHeadersVisualStyles = false;
-                DataGridViewAppointments.ColumnHeadersDefaultCellStyle = new DataGridViewCellStyle();
-                DataGridViewAppointments.RowHeadersDefaultCellStyle = new DataGridViewCellStyle();
-                DataGridViewAppointments.RowsDefaultCellStyle = new DataGridViewCellStyle();
-                DataGridViewAppointments.AlternatingRowsDefaultCellStyle = new DataGridViewCellStyle();
+                // Applies universal theme
+                GridStyles.ApplyStandardStyle(DataGridViewAppointments);
 
-                DataGridViewAppointments.Font = new Font("Arial", 10, FontStyle.Regular);
-                DataGridViewAppointments.ColumnHeadersDefaultCellStyle.BackColor = Color.Black;
-                DataGridViewAppointments.ColumnHeadersDefaultCellStyle.ForeColor = Color.White;
-                DataGridViewAppointments.ColumnHeadersDefaultCellStyle.Font = new Font(DataGridViewAppointments.Font, FontStyle.Bold);
-                DataGridViewAppointments.RowHeadersDefaultCellStyle.BackColor = Color.DarkGray;
-                DataGridViewAppointments.RowHeadersDefaultCellStyle.ForeColor = Color.White;
-                DataGridViewAppointments.RowsDefaultCellStyle.BackColor = Color.White;
-                DataGridViewAppointments.RowsDefaultCellStyle.ForeColor = Color.Black;
-                DataGridViewAppointments.AlternatingRowsDefaultCellStyle.BackColor = Color.LightGray;
-                DataGridViewAppointments.DefaultCellStyle.SelectionBackColor = Color.Black;
-                DataGridViewAppointments.DefaultCellStyle.SelectionForeColor = Color.Gray;
-                DataGridViewAppointments.RowStateChanged += DataGridViewAppointments_RowStateChanged;
+                // Default calendar to today
+                monthCalendarAppointments.SetDate(DateTime.Today);
 
-                // Default to today
-                DateTime today = DateTime.Today;
-                monthCalendarAppointments.SetDate(today);
+                // Load appointments
+                DataTable appointmentData = _customerId.HasValue
+                    ? DbManager.GetAppointments(_customerId.Value)
+                    : DbManager.GetAllAppointments();
 
-                // Load appointments (filtered if needed)
-                DataTable appointmentsData;
-                if (_customerId.HasValue)
-                    appointmentsData = DbManager.GetAppointments(_customerId.Value);
-                else
-                    appointmentsData = DbManager.GetAllAppointments();
+                // Convert UTC -> Local for display
+                ConvertUtcColumnsToLocal(appointmentData);
 
-                // Convert UTC time to local time
-                ConvertUtcColumnsToLocal(appointmentsData); 
-
-                DataGridViewAppointments.DataSource = appointmentsData;
+                // Bind grid
+                DataGridViewAppointments.DataSource = appointmentData;
                 DataGridViewAppointments.ClearSelection();
+                DataGridViewAppointments.CurrentCell = null;
 
-                // Column widths + formats (no horizontal scrolling)
+                // Layout / formatting 
                 DataGridViewAppointments.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None;
-                DataGridViewAppointments.ScrollBars = ScrollBars.Vertical; // prevents horizontal scroll
+                DataGridViewAppointments.ScrollBars = ScrollBars.Vertical;
 
-                // Hide AppointmentID but keep it for edit/delete
-                if (DataGridViewAppointments.Columns.Contains("AppointmentID"))
-                    {
-                    DataGridViewAppointments.Columns["AppointmentID"].Visible = false;
-                    }
+                if (DataGridViewAppointments.Columns.Contains("appointmentId"))
+                    DataGridViewAppointments.Columns["appointmentId"].Visible = false;
 
-                // CustomerName: size to content (or keep 150 if you prefer)
                 if (DataGridViewAppointments.Columns.Contains("CustomerName"))
-                    {
                     DataGridViewAppointments.Columns["CustomerName"].AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
-                    }
 
-                // AppointmentType: FLEX column (this is the key)
                 if (DataGridViewAppointments.Columns.Contains("AppointmentType"))
-                    {
                     DataGridViewAppointments.Columns["AppointmentType"].AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
-                    }
 
-                // Start: fixed width
                 if (DataGridViewAppointments.Columns.Contains("Start"))
                     {
                     DataGridViewAppointments.Columns["Start"].DefaultCellStyle.Format = "MM/dd/yy hh:mm tt";
@@ -138,42 +110,16 @@ namespace SchedulingApp
                     DataGridViewAppointments.Columns["Start"].Width = 170;
                     }
 
-                // End: fixed width
                 if (DataGridViewAppointments.Columns.Contains("End"))
                     {
                     DataGridViewAppointments.Columns["End"].DefaultCellStyle.Format = "MM/dd/yy hh:mm tt";
                     DataGridViewAppointments.Columns["End"].AutoSizeMode = DataGridViewAutoSizeColumnMode.None;
                     DataGridViewAppointments.Columns["End"].Width = 170;
                     }
-
                 }
             catch (Exception ex)
                 {
                 MessageBox.Show("Error loading appointments: " + ex.Message);
-                }
-            }
-
-        // Makes selected row bold
-        private void DataGridViewAppointments_RowStateChanged(object sender, DataGridViewRowStateChangedEventArgs e)
-            {
-            if (e.Row.Selected)
-                {
-                e.Row.DefaultCellStyle.Font = new Font(DataGridViewAppointments.Font, FontStyle.Bold);
-                }
-            else
-                {
-                e.Row.DefaultCellStyle.Font = new Font(DataGridViewAppointments.Font, FontStyle.Regular);
-                }
-            }
-
-        // Apply alternating row colors method
-        private void ApplyAlternatingRowColors()
-            {
-            for (int i = 0; i < DataGridViewAppointments.Rows.Count; i++)
-                {
-                DataGridViewAppointments.Rows[i].DefaultCellStyle.BackColor =
-                    (i % 2 == 0) ? Color.LightGray : Color.White;
-                DataGridViewAppointments.Rows[i].DefaultCellStyle.ForeColor = Color.Black;
                 }
             }
 
@@ -195,13 +141,13 @@ namespace SchedulingApp
                 connection.Open();
 
                 string query = @"
-            SELECT a.AppointmentID,
-                   c.Name AS CustomerName,
+            SELECT a.appointmentId,
+                   c.customerName AS CustomerName,
                    a.Title AS AppointmentType,
                    a.Start,
                    a.End
-            FROM appointments a
-            JOIN customers c ON a.CustomerID = c.CustomerID
+            FROM appointment a
+            JOIN customer c ON a.CustomerID = c.CustomerID
             WHERE a.Start >= @StartUtc AND a.Start < @NextUtc
             ORDER BY a.Start;";
 
@@ -219,16 +165,15 @@ namespace SchedulingApp
 
                         DataGridViewAppointments.DataSource = dt;
                         DataGridViewAppointments.ClearSelection();
-                        ApplyAlternatingRowColors();
                         }
                     }
                 } 
 
-            // Hide AppointmentID column (keep it for edit/delete)
-            if (DataGridViewAppointments.Columns.Contains("AppointmentID"))
-                DataGridViewAppointments.Columns["AppointmentID"].Visible = false;
+            // Hides appointmentId column
+            if (DataGridViewAppointments.Columns.Contains("appointmentId"))
+                DataGridViewAppointments.Columns["appointmentId"].Visible = false;
 
-            // Fixed sizing like your other screens
+            // Layout / formatting
             DataGridViewAppointments.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None;
 
             if (DataGridViewAppointments.Columns.Contains("CustomerName"))
@@ -249,18 +194,10 @@ namespace SchedulingApp
                 DataGridViewAppointments.Columns["End"].Width = 170;
                 }
 
-            // Force alternating row colors (first row gray)
-            for (int i = 0; i < DataGridViewAppointments.Rows.Count; i++)
-                {
-                DataGridViewAppointments.Rows[i].DefaultCellStyle.BackColor =
-                    (i % 2 == 0) ? Color.LightGray : Color.White;
-                DataGridViewAppointments.Rows[i].DefaultCellStyle.ForeColor = Color.Black;
-                }
-
             DataGridViewAppointments.ClearSelection();
             }
 
-        // Open the Customers form
+        // ************ CUSTOMERS FORM BUTTON ************
         private void ButtonCustomers_Click(object sender, EventArgs e)
             {
             Customers custForm = new Customers(); 
@@ -268,40 +205,41 @@ namespace SchedulingApp
             this.Close(); // Close the current Appointments form
             }
 
-        // Add Appointment button form
+        // *********** ADD BUTTON ***********
         private void ButtonAddAppt_Click(object sender, EventArgs e)
             {
             using (var form = new AppointmentInfo())
                 {
                 if (form.ShowDialog() == DialogResult.OK)
                     {
+                    GridStyles.ApplyStandardStyle(DataGridViewAppointments);
                     LoadAppointments();
                     }
                 }
             }
 
-        // Edit Appointment button click
+        // ******** EDIT BUTTON ********
         private void ButtonEditAppt_Click(object sender, EventArgs e)
             {
             if (DataGridViewAppointments.SelectedRows.Count == 0)
                 {
-                // If something triggered edit during refresh, don't nag the user
                 if (_suppressEditPrompt) return;
 
                 MessageBox.Show("Please select an appointment to edit.");
                 return;
                 }
 
-            int appointmentId = Convert.ToInt32(DataGridViewAppointments.SelectedRows[0].Cells["AppointmentID"].Value);
+            int appointmentId = Convert.ToInt32(DataGridViewAppointments.SelectedRows[0].Cells["appointmentId"].Value);
 
             using (var form = new AppointmentInfo(appointmentId))
                 {
                 if (form.ShowDialog() == DialogResult.OK)
-                    LoadAppointments();
+                GridStyles.ApplyStandardStyle(DataGridViewAppointments);
+                LoadAppointments();
                 }
             }
 
-        // Delete Appointment button click
+        // ******* DELETE BUTTON ********
         private void ButtonDeleteAppt_Click(object sender, EventArgs e)
             {
             if (DataGridViewAppointments.SelectedRows.Count == 0)
@@ -311,7 +249,7 @@ namespace SchedulingApp
                 }
 
             DataGridViewRow row = DataGridViewAppointments.SelectedRows[0];
-            int appointmentId = Convert.ToInt32(row.Cells["AppointmentID"].Value);
+            int appointmentId = Convert.ToInt32(row.Cells["appointmentId"].Value);
 
             DialogResult result = MessageBox.Show(
                 "Are you sure you want to delete this appointment?",
@@ -323,11 +261,12 @@ namespace SchedulingApp
             if (result == DialogResult.Yes)
                 {
                 DbManager.DeleteAppointment(appointmentId);
+                GridStyles.ApplyStandardStyle(DataGridViewAppointments);
                 LoadAppointments();
                 }
             }
 
-        // All Appointments button
+        // ********** ALL APPOINTMENTS BUTTON **********
         private void ButtonAll_Click(object sender, EventArgs e)
             {
             new Appointments().Show();
@@ -354,6 +293,7 @@ namespace SchedulingApp
                     dt.DefaultView.Sort = "Start ASC";
 
                 DataGridViewAppointments.DataSource = dt.DefaultView;
+                DataGridViewAppointments.ClearSelection();
 
                 if (DataGridViewAppointments.Columns.Contains("Start"))
                     {
@@ -382,10 +322,15 @@ namespace SchedulingApp
                 }
             }
 
-        // Reports button
+        // ********* REPORTS BUTTON *********
         private void ButtonReports_Click(object sender, EventArgs e)
             {
             new Reports().Show();
+            }
+
+        private void Appointments_Activated(object sender, EventArgs e)
+            {
+            LoadAppointments(); 
             }
 
         }

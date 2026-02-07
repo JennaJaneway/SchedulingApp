@@ -24,27 +24,36 @@ namespace SchedulingApp
             ButtonRun.Click += ButtonRun_Click;
             }
 
+        // ************** RUN REPORT BUTTON CLICK **************
         private void ButtonRun_Click(object sender, EventArgs e)
             {
             DataTable raw = DbManager.GetAppointmentsForReports();
 
+            DataTable reportTable;
+
             if (ComboBoxReports.SelectedItem.ToString() == "Appointment types by month")
                 {
-                DataGridViewReports.DataSource = BuildTypesByMonth(raw);
+                reportTable = BuildTypesByMonth(raw);
                 }
             else if (ComboBoxReports.SelectedItem.ToString() == "Schedule for each user")
                 {
-                DataGridViewReports.DataSource = BuildScheduleByUser(raw);
+                reportTable = BuildScheduleByUser(raw);
                 }
-            else if (ComboBoxReports.SelectedItem.ToString() == "Appointments by customer")
+            else // "Appointments by customer"
                 {
-                DataGridViewReports.DataSource = BuildAppointmentsByCustomer(raw);
+                reportTable = BuildAppointmentsByCustomer(raw);
                 }
-            ConvertUtcColumnsToLocal(raw);
+
+            // Convert the columns on the table that will be displayed
+            ConvertUtcColumnsToLocal(reportTable);
+
+            DataGridViewReports.DataSource = reportTable;
+
             ApplyReportsGridStyle();
             DataGridViewReports.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
             DataGridViewReports.ClearSelection();
             }
+
 
         // Converts Start/End columns from UTC (DB) to LOCAL (UI)
         private void ConvertUtcColumnsToLocal(DataTable dt)
@@ -76,7 +85,7 @@ namespace SchedulingApp
                 }
             }
 
-        // REPORT 1 — Appointment types by month
+        // *********** REPORT 1 — Appointment types by month ************
         private DataTable BuildTypesByMonth(DataTable raw)
             {
             var results = raw.AsEnumerable()
@@ -107,7 +116,7 @@ namespace SchedulingApp
             return dt;
             }
 
-        // REPORT 2 — Schedule for each user
+        // ****** REPORT 2 — Schedule for each user ******
         private DataTable BuildScheduleByUser(DataTable raw)
             {
             var results = raw.AsEnumerable()
@@ -136,7 +145,7 @@ namespace SchedulingApp
             return dt;
             }
 
-        // REPORT 3 — Appointments by customer (extra report)
+        // ******* REPORT 3 — Appointments by customer name *******
         private DataTable BuildAppointmentsByCustomer(DataTable raw)
             {
             var results = raw.AsEnumerable()
@@ -161,57 +170,17 @@ namespace SchedulingApp
             return dt;
             }
 
+        // ************** STYLING FOR REPORTS DATA GRID **************
         private void ApplyReportsGridStyle()
             {
-            DataGridViewReports.AutoGenerateColumns = true;
-            DataGridViewReports.EnableHeadersVisualStyles = false;
-
-            // Reset styles 
-            DataGridViewReports.ColumnHeadersDefaultCellStyle = new DataGridViewCellStyle();
-            DataGridViewReports.RowHeadersDefaultCellStyle = new DataGridViewCellStyle();
-            DataGridViewReports.RowsDefaultCellStyle = new DataGridViewCellStyle();
-            DataGridViewReports.AlternatingRowsDefaultCellStyle = new DataGridViewCellStyle();
-            DataGridViewReports.DefaultCellStyle = new DataGridViewCellStyle();
-
-            DataGridViewReports.Font = new Font("Arial", 10, FontStyle.Regular);
-
-            // Headers
-            DataGridViewReports.ColumnHeadersDefaultCellStyle.BackColor = Color.Black;
-            DataGridViewReports.ColumnHeadersDefaultCellStyle.ForeColor = Color.White;
-            DataGridViewReports.ColumnHeadersDefaultCellStyle.Font = new Font(DataGridViewReports.Font, FontStyle.Bold);
-
-            DataGridViewReports.RowHeadersDefaultCellStyle.BackColor = Color.DarkGray;
-            DataGridViewReports.RowHeadersDefaultCellStyle.ForeColor = Color.White;
-
-            // Rows + alternating rows 
-            DataGridViewReports.RowsDefaultCellStyle.BackColor = Color.White;
-            DataGridViewReports.RowsDefaultCellStyle.ForeColor = Color.Black;
-
-            DataGridViewReports.AlternatingRowsDefaultCellStyle.BackColor = Color.LightGray;
-            DataGridViewReports.AlternatingRowsDefaultCellStyle.ForeColor = Color.Black;
-
-            // Selection
-            DataGridViewReports.DefaultCellStyle.SelectionBackColor = Color.Black;
-            DataGridViewReports.DefaultCellStyle.SelectionForeColor = Color.Gray;
-
-            DataGridViewReports.BackgroundColor = Color.White;
-            DataGridViewReports.BorderStyle = BorderStyle.None;
-            DataGridViewReports.GridColor = Color.LightGray;
-
+            GridStyles.ApplyStandardStyle(DataGridViewReports); // from GridStyles.cs
             DataGridViewReports.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
             DataGridViewReports.MultiSelect = false;
             DataGridViewReports.ReadOnly = true;
             DataGridViewReports.AllowUserToAddRows = false;
             DataGridViewReports.AllowUserToDeleteRows = false;
             DataGridViewReports.AllowUserToResizeRows = false;
-
-            // Fill the grid
             DataGridViewReports.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
-            }
-
-        private void Reports_Load(object sender, EventArgs e)
-            {
-            ApplyReportsGridStyle();
             }
 
         }

@@ -108,7 +108,6 @@
             this.DataGridViewCustomers.SelectionMode = System.Windows.Forms.DataGridViewSelectionMode.FullRowSelect;
             this.DataGridViewCustomers.Size = new System.Drawing.Size(1113, 270);
             this.DataGridViewCustomers.TabIndex = 9;
-            this.DataGridViewCustomers.CellContentClick += new System.Windows.Forms.DataGridViewCellEventHandler(this.DataGridView1_CellContentClick);
             this.DataGridViewCustomers.CellDoubleClick += new System.Windows.Forms.DataGridViewCellEventHandler(this.DataGridViewCustomers_CellDoubleClick);
             // 
             // ButtonAdd
@@ -199,7 +198,7 @@
             this.ButtonClear.UseVisualStyleBackColor = true;
             this.ButtonClear.Click += new System.EventHandler(this.ButtonClearSelection_Click);
             // 
-            // customers
+            // Customers
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(8F, 16F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
@@ -215,8 +214,9 @@
             this.Controls.Add(this.DataGridViewCustomers);
             this.Controls.Add(this.LogoBox1);
             this.Margin = new System.Windows.Forms.Padding(4);
-            this.Name = "customers";
+            this.Name = "Customers";
             this.Text = "Customers";
+            this.Activated += new System.EventHandler(this.Customers_Activated);
             this.Load += new System.EventHandler(this.Customers_Load);
             ((System.ComponentModel.ISupportInitialize)(this.LogoBox1)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.DataGridViewCustomers)).EndInit();

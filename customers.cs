@@ -12,6 +12,7 @@ namespace SchedulingApp
     {
     public partial class Customers : Form
         {
+        private bool _needsRefresh;
         public Customers()
             {
             InitializeComponent();
@@ -39,135 +40,78 @@ namespace SchedulingApp
             {
             DataGridViewCustomers.ClearSelection();
 
-            // Clear "current" row/cell that WinForms loves to keep
+            // Clears "current" row/cell
             if (DataGridViewCustomers.Rows.Count > 0)
                 {
                 DataGridViewCustomers.CurrentCell = null;
                 }
-            }
-
-        private void CustomerForm_Load(object sender, EventArgs e)
-            {
-            try
-                {
-                DataGridViewCustomers.AutoGenerateColumns = true;
-
-                DataTable customersData = DbManager.GetCustomers();
-                DataGridViewCustomers.DataSource = customersData;
-                DataGridViewCustomers.ClearSelection();
-                DataGridViewCustomers.CurrentCell = null;
-
-                // Hides CustomerID column after binding
-                if (DataGridViewCustomers.Columns.Contains("CustomerID"))
-                    {
-                    DataGridViewCustomers.Columns["CustomerID"].Visible = false;
-                    }
-
-                // General DataGridView colors
-                DataGridViewCustomers.BackgroundColor = Color.LightGray;
-                DataGridViewCustomers.BorderStyle = BorderStyle.None;
-                DataGridViewCustomers.EnableHeadersVisualStyles = false;
-
-                // Column headers
-                DataGridViewCustomers.ColumnHeadersDefaultCellStyle.BackColor = Color.DarkSlateGray;
-                DataGridViewCustomers.ColumnHeadersDefaultCellStyle.ForeColor = Color.White;
-                DataGridViewCustomers.ColumnHeadersDefaultCellStyle.Font =
-                    new Font(DataGridViewCustomers.Font, FontStyle.Bold);
-
-                // Row headers
-                DataGridViewCustomers.RowHeadersDefaultCellStyle.BackColor = Color.DarkSlateGray;
-                DataGridViewCustomers.RowHeadersDefaultCellStyle.ForeColor = Color.White;
-
-                // Rows
-                DataGridViewCustomers.RowsDefaultCellStyle.BackColor = Color.White;
-                DataGridViewCustomers.AlternatingRowsDefaultCellStyle.BackColor = Color.LightGray;
-                DataGridViewCustomers.RowsDefaultCellStyle.ForeColor = Color.Black;
-
-                // Selection
-                DataGridViewCustomers.DefaultCellStyle.SelectionBackColor = Color.DarkRed;
-                DataGridViewCustomers.DefaultCellStyle.SelectionForeColor = Color.White;
-
-                DataGridViewCustomers.ClearSelection();
-                DataGridViewCustomers.CurrentCell = null;
-                }
-            catch (Exception ex)
-                {
-                MessageBox.Show("Error loading customers: " + ex.Message);
-                }
-            }
-
-
-        private void DataGridView1_CellContentClick(object sender, DataGridViewCellEventArgs e)
-            {
-
             }
 
         private void Customers_Load(object sender, EventArgs e)
             {
             try
                 {
-                // Clear any previous styles to avoid designer overrides
-                DataGridViewCustomers.AutoGenerateColumns = true;
-                DataGridViewCustomers.EnableHeadersVisualStyles = false;
-                DataGridViewCustomers.ColumnHeadersDefaultCellStyle = new DataGridViewCellStyle();
-                DataGridViewCustomers.RowHeadersDefaultCellStyle = new DataGridViewCellStyle();
-                DataGridViewCustomers.RowsDefaultCellStyle = new DataGridViewCellStyle();
-                DataGridViewCustomers.AlternatingRowsDefaultCellStyle = new DataGridViewCellStyle();
-                DataGridViewCustomers.Font = new Font("Arial", 10, FontStyle.Regular);
-                DataGridViewCustomers.ColumnHeadersDefaultCellStyle.BackColor = Color.Black;
-                DataGridViewCustomers.ColumnHeadersDefaultCellStyle.ForeColor = Color.White;
-                DataGridViewCustomers.ColumnHeadersDefaultCellStyle.Font = new Font(DataGridViewCustomers.Font, FontStyle.Bold);
-                DataGridViewCustomers.RowHeadersDefaultCellStyle.BackColor = Color.DarkGray;
-                DataGridViewCustomers.RowHeadersDefaultCellStyle.ForeColor = Color.White;
-                DataGridViewCustomers.RowsDefaultCellStyle.BackColor = Color.White;
-                DataGridViewCustomers.RowsDefaultCellStyle.ForeColor = Color.Black;
-                DataGridViewCustomers.AlternatingRowsDefaultCellStyle.BackColor = Color.LightGray;
-                DataGridViewCustomers.DefaultCellStyle.SelectionBackColor = Color.Black;
-                DataGridViewCustomers.DefaultCellStyle.SelectionForeColor = Color.Gray;
-                DataGridViewCustomers.RowStateChanged += DataGridViewCustomers_RowStateChanged;
+                GridStyles.ApplyStandardStyle(DataGridViewCustomers);
 
-                // Bind the data 
-                DataTable customersData = DbManager.GetCustomers();
-                DataGridViewCustomers.DataSource = customersData;
-                DataGridViewCustomers.ClearSelection();
-                DataGridViewCustomers.CurrentCell = null; 
-                HideCustomerID();
-
-                // Custom Column widths
-                if (DataGridViewCustomers.Columns.Contains("Name"))
-                    {
-                    DataGridViewCustomers.Columns["Name"].Width = 150;
-                    DataGridViewCustomers.Columns["Name"].HeaderText = "Customer Name";
-                    }
-                if (DataGridViewCustomers.Columns.Contains("Email"))
-                    DataGridViewCustomers.Columns["Email"].Width = 240;
-                if (DataGridViewCustomers.Columns.Contains("Phone"))
-                    DataGridViewCustomers.Columns["Phone"].Width = 100;
-
+                LoadCustomers();
                 }
             catch (Exception ex)
                 {
                 MessageBox.Show("Error loading customers: " + ex.Message);
                 }
-            if (DataGridViewCustomers.Rows.Count > 0)
-                {
-                DataGridViewCustomers.ClearSelection();
-                DataGridViewCustomers.CurrentCell = null;
-                }
             }
-        // Makes selected row bold
-        private void DataGridViewCustomers_RowStateChanged(object sender, DataGridViewRowStateChangedEventArgs e)
+
+        // Reloads customer data from DB
+        private void LoadCustomers()
             {
-            if (e.Row.Selected)
+            DataGridViewCustomers.DataSource = DbManager.GetCustomers();
+
+            // Hides columns that don't need to be displayed
+            HideIfExists("Active");
+            HideCustomerID();
+
+            // Column formatting
+            SetWidthIfExists("Name", 150);
+            SetHeaderIfExists("Name", "Customer"); // Renames column header
+            SetWidthIfExists("Phone", 80);
+            SetWidthIfExists("City", 90);
+            SetWidthIfExists("Country", 50);
+            SetHeaderIfExists("PostalCode", "Postal Code"); // Renames column header
+            SetWidthIfExists("PostalCode", 60);
+
+            SetDisplayIndexIfExists("PostalCode", DataGridViewCustomers.Columns.Count - 1); // Puts PostalCode last
+
+            DataGridViewCustomers.ClearSelection();
+            DataGridViewCustomers.CurrentCell = null; 
+
+            // ----- local helper methods -----
+            void HideIfExists(string colName)
                 {
-                e.Row.DefaultCellStyle.Font = new Font(DataGridViewCustomers.Font, FontStyle.Bold);
+                if (DataGridViewCustomers.Columns.Contains(colName))
+                    DataGridViewCustomers.Columns[colName].Visible = false;
                 }
-            else
+
+            void SetWidthIfExists(string colName, int width)
                 {
-                e.Row.DefaultCellStyle.Font = new Font(DataGridViewCustomers.Font, FontStyle.Regular);
+                if (DataGridViewCustomers.Columns.Contains(colName))
+                    DataGridViewCustomers.Columns[colName].Width = width;
+                }
+
+            void SetHeaderIfExists(string colName, string headerText)
+                {
+                if (DataGridViewCustomers.Columns.Contains(colName))
+                    DataGridViewCustomers.Columns[colName].HeaderText = headerText;
+                }
+
+            void SetDisplayIndexIfExists(string colName, int displayIndex)
+                {
+                if (DataGridViewCustomers.Columns.Contains(colName))
+                    DataGridViewCustomers.Columns[colName].DisplayIndex = displayIndex;
                 }
             }
 
+
+        // ********** APPOINTMENTS BUTTON **********
         private void ButtonAppointments_Click(object sender, EventArgs e)
             {
             Appointments apptForm;
@@ -194,54 +138,48 @@ namespace SchedulingApp
             {
             if (e.RowIndex >= 0)
                 {
-                var row = DataGridViewCustomers.Rows[e.RowIndex];
-                int customerId = Convert.ToInt32(row.Cells["CustomerID"].Value);
-                string name = row.Cells["Name"].Value.ToString();
-                string email = row.Cells["Email"].Value.ToString();
-                string phone = row.Cells["Phone"].Value.ToString();
-                string address = row.Cells["Address"].Value.ToString();
+                int customerId = Convert.ToInt32(
+                    DataGridViewCustomers.Rows[e.RowIndex].Cells["CustomerID"].Value
+                );
 
-                var form = new CustomerInfo(customerId, name, email, phone, address);
+                var form = new CustomerInfo(customerId);
                 form.Show();
                 this.Close();
                 }
             }
 
-        // Add Customer button
+        // *********** ADD CUSTOMER BUTTON ***********
         private void ButtonAdd_Click(object sender, EventArgs e)
             {
             // Open customerinfo in Add mode
             var form = new CustomerInfo();
+            form.PreviousCustomersForm = this;
+            this.Hide();
             form.Show();
-            this.Close();
             }
 
-        // Edit Customer button
+        // *********** EDIT CUSTOMER BUTTON ************
         private void ButtonEdit_Click(object sender, EventArgs e)
             {
-            if (DataGridViewCustomers.SelectedRows.Count == 0)
+            if (DataGridViewCustomers.CurrentRow == null)
                 {
-                MessageBox.Show("Please select a customer to edit.");
+                MessageBox.Show("Please select a customer.");
                 return;
                 }
 
-            var row = DataGridViewCustomers.SelectedRows[0];
-            int customerId = Convert.ToInt32(row.Cells["CustomerID"].Value);
-            string name = row.Cells["Name"].Value.ToString();
-            string email = row.Cells["Email"].Value.ToString();
-            string phone = row.Cells["Phone"].Value.ToString();
-            string address = row.Cells["Address"].Value.ToString();
+            _needsRefresh = true;
+            int customerId = Convert.ToInt32(DataGridViewCustomers.CurrentRow.Cells["CustomerID"].Value);
 
-            // Pass selected customer data to customerinfo (Edit mode)
-            var form = new CustomerInfo(customerId, name, email, phone, address);
+            var form = new CustomerInfo(customerId);
+            form.PreviousCustomersForm = this;   // pass reference
+            this.Hide();                         // Makes Edit form disappear immediately
             form.Show();
-            this.Close();
             }
 
-        // Delete Customer button
+        // ************** DELETE CUSTOMER BUTTON **************
         private void ButtonDelete_Click(object sender, EventArgs e)
             {
-            // Make sure a row is selected
+            // Makes sure a row is selected
             if (DataGridViewCustomers.CurrentRow == null)
                 {
                 MessageBox.Show("Please select a customer from the grid to delete.", "No Selection",
@@ -257,7 +195,7 @@ namespace SchedulingApp
 
             var confirm = MessageBox.Show(
                 $"Are you sure you want to delete '{customerName}'?\n" +
-                "This will also delete related appointments.",
+                "This will also delete all of the customer's appointments.",
                 "Confirm Delete",
                 MessageBoxButtons.YesNo,
                 MessageBoxIcon.Warning);
@@ -273,6 +211,8 @@ namespace SchedulingApp
 
                 // Rebind
                 DataGridViewCustomers.DataSource = DbManager.GetCustomers();
+                if (DataGridViewCustomers.Columns.Contains("Active"))
+                    DataGridViewCustomers.Columns["Active"].Visible = false;
                 DataGridViewCustomers.ClearSelection();
                 DataGridViewCustomers.CurrentCell = null;
 
@@ -288,13 +228,13 @@ namespace SchedulingApp
                 }
             }
 
-        // Reports button
+        // ********** REPORTS BUTTON **********
         private void ButtonReports_Click(object sender, EventArgs e)
             {
             new Reports().Show();
             }
 
-        // Clear Selection button
+        // *********** CLEAR SELECTION BUTTON ***********
         private void ButtonClearSelection_Click(object sender, EventArgs e)
             {
             DataGridViewCustomers.ClearSelection();
@@ -307,5 +247,14 @@ namespace SchedulingApp
             if (DataGridViewCustomers.Columns.Contains("CustomerID"))
                 DataGridViewCustomers.Columns["CustomerID"].Visible = false;
             }
+
+        // Refresh data when form is activated
+        private void Customers_Activated(object sender, EventArgs e)
+            {
+            if (!_needsRefresh) return;
+            _needsRefresh = false;
+            LoadCustomers();
+            }
+
         }
     }

@@ -27,22 +27,26 @@ namespace SchedulingApp
         // Business hours validation helper
         public static bool ValidateBusinessHours(DateTime startUtc, DateTime endUtc)
             {
+            if (endUtc <= startUtc) return false;
+
             TimeZoneInfo eastern = TimeZoneInfo.FindSystemTimeZoneById("Eastern Standard Time");
 
             DateTime startEst = TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(startUtc, DateTimeKind.Utc), eastern);
             DateTime endEst = TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(endUtc, DateTimeKind.Utc), eastern);
 
-            // Monday–Friday based on Eastern
-            bool isWeekday = startEst.DayOfWeek >= DayOfWeek.Monday &&
-                             startEst.DayOfWeek <= DayOfWeek.Friday;
+            bool startIsWeekday = startEst.DayOfWeek >= DayOfWeek.Monday && startEst.DayOfWeek <= DayOfWeek.Friday;
+            bool endIsWeekday = endEst.DayOfWeek >= DayOfWeek.Monday && endEst.DayOfWeek <= DayOfWeek.Friday;
+
+            bool sameEasternDay = startEst.Date == endEst.Date; // Appointments must start and end on the same calendar day in EST
 
             TimeSpan open = new TimeSpan(9, 0, 0);
             TimeSpan close = new TimeSpan(17, 0, 0);
 
-            // Allow ending exactly at 5:00 PM, but NOT after.
-            bool withinHours = startEst.TimeOfDay >= open && endEst.TimeOfDay <= close;
+            bool withinHours =
+                startEst.TimeOfDay >= open &&
+                endEst.TimeOfDay <= close;
 
-            return isWeekday && withinHours;
+            return startIsWeekday && endIsWeekday && sameEasternDay && withinHours;
             }
 
         }

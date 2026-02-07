@@ -1,4 +1,5 @@
-﻿using System;
+﻿using MySqlConnector;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
@@ -20,13 +21,13 @@ namespace SchedulingApp
             {
             InitializeComponent();
 
-            this.AcceptButton = ButtonLogin; // Pressing Enter anywhere triggers login
+            this.AcceptButton = ButtonLogin; // Allows "Enter" key to trigger login
         }
 
     private void LoginForm_Load(object sender, EventArgs e)
             {
-            CultureInfo currentCulture = Thread.CurrentThread.CurrentUICulture; // Get current system culture (language and region)
-            RegionInfo region = new RegionInfo(currentCulture.Name); // Get region info from the culture
+            CultureInfo currentCulture = Thread.CurrentThread.CurrentUICulture; // Gets current system culture (language and region)
+            RegionInfo region = new RegionInfo(currentCulture.Name); // Gets region info from the culture
             LabelLocation.Text = "Location: " + region.EnglishName;
             LabelLanguage.Text = "Language: " + currentCulture.DisplayName;
             ButtonLogin.Text = Resources.LoginButtonText;
@@ -36,48 +37,77 @@ namespace SchedulingApp
             this.BackgroundImageLayout = ImageLayout.Stretch;
             }
 
+        // ************** LOGIN BUTTON CLICK **************
         private void ButtonLogin_Click(object sender, EventArgs e)
             {
             string username = TextBoxUsername.Text.Trim();
             string password = TextBoxPassword.Text.Trim();
 
-            if (username == "test" && password == "test")
+            if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password))
                 {
+                MessageBox.Show("Please enter a username and password.", "Error",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+                }
 
-                // Record login in the log file
+            try
+                {
+                // Authenticates against DB
+                int userId = DbManager.ValidateUser(username, password); // return userId if valid, else -1
+
+                if (userId < 0)
+                    {
+                    MessageBox.Show(Properties.Resources.LoginError, "Error",
+                        MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    return;
+                    }
+
+                // Record login in the log file (use a stable path)
                 string logLine = $"{DateTime.Now}: {username}";
-                System.IO.File.AppendAllText("Login_History.txt", logLine + Environment.NewLine);
+                string logPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Login_History.txt");
+                System.IO.File.AppendAllText(logPath, logLine + Environment.NewLine);
 
                 // Set session
-                Session.CurrentUserId = DbManager.GetUserIdByUsername(username);
+                Session.CurrentUserId = userId;
                 Session.CurrentUsername = username;
 
                 // Alert if appointment within 15 minutes
                 DataRow upcoming = DbManager.GetUpcomingAppointmentWithinMinutes(Session.CurrentUserId, 15);
                 if (upcoming != null)
                     {
-                    DateTime start = Convert.ToDateTime(upcoming["Start"]);
-                    string title = upcoming["Title"].ToString();
+                    DateTime startUtc = Convert.ToDateTime(upcoming["start"]);
+                    DateTime startLocal = DateTime.SpecifyKind(startUtc, DateTimeKind.Utc).ToLocalTime();
+                    string title = upcoming["title"].ToString();
 
                     MessageBox.Show(
-                        $"Hello, you have an appointment within 15 minutes!\n\n" +
-                        $"Title: {title}\n at {start: hh:mm tt}",
+                        $"Good day! You have an appointment within 15 minutes!\n\nTitle: {title}\n at {startLocal:hh:mm tt}",
                         "Upcoming Appointment Alert",
                         MessageBoxButtons.OK,
                         MessageBoxIcon.Information
                     );
                     }
 
-                // Open Customers form
                 Customers customers = new Customers();
                 customers.Show();
                 this.Hide();
                 }
-
-            else
+            catch (MySqlException ex)
                 {
-                // Failed login, show error
-                MessageBox.Show(Properties.Resources.LoginError, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show(
+                    "Database connection failed. Whomp, whomp.\n\n" + ex.Message,
+                    "Login Error",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error
+                );
+                }
+            catch (Exception ex)
+                {
+                MessageBox.Show(
+                    "An unexpected error occurred during login. Whomp, whomp.\n\n" + ex.Message,
+                    "Login Error",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error
+                );
                 }
             }
 

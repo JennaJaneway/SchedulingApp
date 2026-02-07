@@ -22,6 +22,7 @@ namespace SchedulingApp
             InitializeComponent();
             appointmentId = apptId;
             isEditMode = appointmentId.HasValue;
+            comboBoxApptType.DropDownStyle = ComboBoxStyle.DropDownList;
 
             // Wire calendar buttons and calendar selection
             ButtonStartTime.Click += ButtonStartTime_Click;
@@ -37,28 +38,40 @@ namespace SchedulingApp
             comboBoxCustomer.DisplayMember = "Name";
             comboBoxCustomer.ValueMember = "CustomerID";
 
-            // Populate appointment types (if not already set in Designer)
+            // Populate appointment types 
             comboBoxApptType.Items.Clear();
             comboBoxApptType.Items.AddRange(new object[]
             {
             "Consultation",
             "Follow-up",
             "Therapy Session",
-            "Review Meeting",
-            "Training",
-            "Support Call",
-            "Demo / Presentation"
+            "Cybersecurity",
+            "Martial Arts Training",
+            "Criminal Tactics",
+            "Crime Scene Investigation",
+            "Electroshock Therapy"
             });
 
-            // If edit mode, load the appointment record into the controls
+            // If in edit mode, load the appointment record into the controls
             if (isEditMode && appointmentId.HasValue)
                 {
                 DataRow row = DbManager.GetAppointmentById(appointmentId.Value);
                 if (row != null)
                     {
-                    // adjust keys if your DbManager returns different column names
                     comboBoxCustomer.SelectedValue = Convert.ToInt32(row["CustomerID"]);
-                    comboBoxApptType.SelectedItem = row["AppointmentType"].ToString();
+                    string typeFromDb = row["AppointmentType"]?.ToString()?.Trim();
+
+                    int idx = comboBoxApptType.FindStringExact(typeFromDb);
+                    if (idx >= 0)
+                        {
+                        comboBoxApptType.SelectedIndex = idx;
+                        }
+                    else
+                        {
+                        // Safety fallback in case DB has a value not in the list
+                        comboBoxApptType.Items.Add(typeFromDb);
+                        comboBoxApptType.SelectedIndex = comboBoxApptType.Items.Count - 1;
+                        }
 
                     // DB stores UTC, convert to LOCAL for the DateTimePickers
                     DateTime startUtcFromDb = Convert.ToDateTime(row["Start"]);
@@ -82,7 +95,7 @@ namespace SchedulingApp
                 }
             }
 
-        // ****** Calendar popup handlers *******
+        // Calendar popup handlers
         private void ButtonStartTime_Click(object sender, EventArgs e)
             {
             _datePickTarget = DatePickTarget.Start;
@@ -105,6 +118,7 @@ namespace SchedulingApp
             monthCalendarPicker.BringToFront();
             }
 
+        // Handles date selection from calendar popup
         private void MonthCalendarPicker_DateSelected(object sender, DateRangeEventArgs e)
             {
             DateTime chosenDate = e.Start.Date;
@@ -128,9 +142,9 @@ namespace SchedulingApp
 
             monthCalendarPicker.Visible = false;
             }
+        // End calendar popup handlers
 
-        // ****** End calendar popup handlers ******
-
+        // ********* SAVE BUTTON **************
         private void ButtonSave_Click(object sender, EventArgs e)
             {
             try
@@ -138,7 +152,7 @@ namespace SchedulingApp
                 // Validate customer selection
                 if (comboBoxCustomer.SelectedItem == null)  
                     {
-                    MessageBox.Show("You must select a customer.");
+                    MessageBox.Show("Please select a customer.");
                     return;
                     }
                 int customerId = Convert.ToInt32(comboBoxCustomer.SelectedValue);
@@ -146,10 +160,10 @@ namespace SchedulingApp
                 // Validate type
                 if (comboBoxApptType.SelectedItem == null)
                     {
-                    MessageBox.Show("You must select an appointment type.");
+                    MessageBox.Show("Please select an appointment type.");
                     return;
                     }
-                string type = comboBoxApptType.SelectedItem.ToString();
+                string type = comboBoxApptType.Text.Trim();
 
                 // Times from picker (local)
                 DateTime startLocal = TrimToMinute(dateTimeStart.Value);
@@ -165,7 +179,7 @@ namespace SchedulingApp
                 // basic checks (still valid)
                 if (endUtc <= startUtc)
                     {
-                    // TEST MESSAGE
+                    // End time check
                     MessageBox.Show("End time must be later than Start time.");
                     return;
                     }
@@ -177,7 +191,7 @@ namespace SchedulingApp
                     return;
                     }
 
-                // Overlap check (per user, UTC)
+                // Appointment Overlap check (per user, UTC)
                 int userId = Session.CurrentUserId;
 
                 if (DbManager.AppointmentOverlapsForUser(appointmentId, userId, startUtc, endUtc))
@@ -205,7 +219,7 @@ namespace SchedulingApp
                 }
             }
 
-        // Delete button
+        // ********* DELETE BUTTON **************
         private void ButtonDelete_Click(object sender, EventArgs e)
             {
             if (!isEditMode || !appointmentId.HasValue)
@@ -228,13 +242,14 @@ namespace SchedulingApp
                 }
             }
 
-        // Cancel button
+        // ********* CANCEL BUTTON **********
         private void ButtonCancel_Click(object sender, EventArgs e)
             {
             this.DialogResult = DialogResult.Cancel;
             this.Close();
             }
 
+        // Helper to trim seconds/milliseconds from DateTime
         private static DateTime TrimToMinute(DateTime dt)
             {
             return new DateTime(dt.Year, dt.Month, dt.Day, dt.Hour, dt.Minute, 0, dt.Kind);

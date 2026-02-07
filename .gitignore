@@ -1,0 +1,14 @@
+# Visual Studio
+.vs/
+*.user
+*.suo
+
+# Build outputs
+bin/
+obj/
+
+# Logs / local files
+Login_History.txt
+
+# NuGet (optional; safe either way)
+packages/
