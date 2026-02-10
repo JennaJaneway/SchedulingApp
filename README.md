@@ -27,15 +27,12 @@ The application detects the user’s system language and displays login error me
 ### French Login Failure Example
 When the system language is set to French, failed login attempts display localized error messages.
 
-![French Login Error](screenshots/login-french-error.jpg)
+![French Login Error](screenshots/LoginFrenchError.jpg)
 
 ## Screenshots
 
 ### Login
 ![Login Screen](screenshots/Login.jpg)
-
-### French Login Error (Localization Example)
-![French Login Error](screenshots/LoginFrenchError.jpg)
 
 ### Customers
 ![Customers Screen](screenshots/Customers.jpg)
